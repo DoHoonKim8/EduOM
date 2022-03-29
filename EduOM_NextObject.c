@@ -90,8 +90,45 @@ Four EduOM_NextObject(
     
     if (nextOID == NULL) ERR(eBADOBJECTID_OM);
 
+    /* read the catalog object */
+    e = BfM_GetTrain((TrainID*)catObjForFile, (char**)&catPage, PAGE_BUF);
+    if (e < 0) ERR( e );
+    GET_PTR_TO_CATENTRY_FOR_DATA(catObjForFile, catPage, catEntry);
 
+    if (curOID == NULL) {
+        pid.pageNo = catEntry->firstPage;
+        pid.volNo = catEntry->fid.volNo;
+        i = 0;
+    } else {
+        pid.pageNo = curOID->pageNo;
+        pid.volNo = curOID->volNo;
+        i = curOID->slotNo + 1;
+    }
 
-    return(EOS);		/* end of scan */
+    BfM_FreeTrain((TrainID*)catObjForFile, PAGE_BUF);
+
+    while (1) {
+        e = BfM_GetTrain(&pid, (char**)&apage, PAGE_BUF);
+        if (e < 0) ERR( e );
+        for (; i < apage->header.nSlots; i++) {
+            offset = apage->slot[-i].offset;
+            if (offset != EMPTYSLOT) {
+                obj = (Object*)&(apage->data[offset]);
+                MAKE_OBJECTID(*nextOID, pid.volNo, pid.pageNo, i, apage->slot[-i].unique);
+                if (objHdr != NULL) {
+                    objHdr->properties = obj->header.properties;
+                    objHdr->length = obj->header.length;
+                    objHdr->tag = obj->header.tag;
+                }
+                BfM_FreeTrain(&pid, PAGE_BUF);
+                return( eNOERROR );
+            }
+        }
+        if (apage->header.nextPage == NIL) ERRB1(EOS, &pid, PAGE_BUF);
+        pageNo = apage->header.nextPage;
+        BfM_FreeTrain(&pid, PAGE_BUF);
+        pid.pageNo = pageNo;
+        i = 0;
+    }
     
 } /* EduOM_NextObject() */
