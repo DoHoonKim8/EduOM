@@ -108,10 +108,7 @@ Four EduOM_ReadObject(
     
     if (buf == NULL) ERR(eBADUSERBUF_OM);
 
-    pid.pageNo = oid->pageNo;
-    pid.volNo = oid->volNo;
-
-    e = BfM_GetTrain(&pid, apage->data, PAGE_BUF);
+    e = BfM_GetTrain((TrainID*)oid, (char**)&apage, PAGE_BUF);
     if (e < 0) ERR( e );
 
     e = IS_VALID_OBJECTID(oid, apage);
@@ -121,6 +118,8 @@ Four EduOM_ReadObject(
     for (int i = 0; i < (length == REMAINDER ? obj->header.length : length); i++) {
         buf[i] = obj->data[i];
     }
+
+    BfM_FreeTrain((TrainID*)oid, PAGE_BUF);
 
     return(length);
     
