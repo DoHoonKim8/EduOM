@@ -90,7 +90,70 @@ Four EduOM_NextObject(
     
     if (nextOID == NULL) ERR(eBADOBJECTID_OM);
 
+    /* read the catalog object */
+    e = BfM_GetTrain((TrainID*)catObjForFile, (char**)&catPage, PAGE_BUF);
+    if (e < 0) ERR( e );
+    GET_PTR_TO_CATENTRY_FOR_DATA(catObjForFile, catPage, catEntry);
 
+    if (curOID == NULL) {
+        pageNo = catEntry->firstPage;
+        while (pageNo != NIL) {
+            pid.pageNo = pageNo;
+            pid.volNo = catPage->header.pid.volNo;
+            e = BfM_GetTrain(&pid, (char**)&apage, PAGE_BUF);
+            if (e < 0) ERR( e );
+            /* if the page is empty */
+            if (apage->header.nSlots == 1) {
+                pageNo = apage->header.nextPage;
+                BfM_FreeTrain(&pid, PAGE_BUF);
+                continue;
+            }
+            offset = apage->slot[-1].offset;
+            objHdr = (ObjectHdr*)(apage->data[offset]);
+            MAKE_OBJECTID(*nextOID, pid.volNo, pid.pageNo, 1, apage->slot[-1].unique);
+            return(EOS);
+        }
+        return(EOS);
+    } else {
+        pageNo = catEntry->firstPage;
+        do {
+            pid.pageNo = pageNo;
+            pid.volNo = catPage->header.pid.volNo;
+            e = BfM_GetTrain(&pid, (char**)&apage, PAGE_BUF);
+            if (e < 0) ERR( e );
+            pageNo = apage->header.nextPage;
+        } while (pageNo != curOID->pageNo);
+
+        while (1) {
+            pid.pageNo = pageNo;
+            pid.volNo = catPage->header.pid.volNo;
+            e = BfM_GetTrain(&pid, (char**)&apage, PAGE_BUF);
+            if (e < 0) ERR( e );
+            if (pageNo == curOID->pageNo) {
+                pageNo = apage->header.nextPage;
+                break;
+            }
+            BfM_FreeTrain(&pid, PAGE_BUF);
+            pageNo = apage->header.nextPage;
+        }
+
+        /* if the object found is the last object of the page */
+        if (curOID->slotNo + 1 == apage->header.nSlots) {
+            /* if the object found is the last object of the file’s last page */
+            if (apage->header.pid.pageNo == catEntry->lastPage) return(EOS);
+            pid.pageNo = pageNo;
+            pid.volNo = apage->header.pid.volNo;
+            e = BfM_GetTrain(&pid, (char**)&apage, PAGE_BUF);
+            if (e < 0) ERR( e );
+            offset = apage->slot[-1].offset;
+            objHdr = (ObjectHdr*)(apage->data[offset]);
+            MAKE_OBJECTID(*nextOID, pid.volNo, pid.pageNo, 1, apage->slot[-1].unique);
+            return(EOS);
+        }
+    }
+
+    /* unfix the page storing catalog object */
+    BfM_FreeTrain((TrainID*)catObjForFile, PAGE_BUF);
 
     return(EOS);		/* end of scan */
     
