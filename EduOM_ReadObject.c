@@ -108,7 +108,19 @@ Four EduOM_ReadObject(
     
     if (buf == NULL) ERR(eBADUSERBUF_OM);
 
-    
+    pid.pageNo = oid->pageNo;
+    pid.volNo = oid->volNo;
+
+    e = BfM_GetTrain(&pid, apage->data, PAGE_BUF);
+    if (e < 0) ERR( e );
+
+    e = IS_VALID_OBJECTID(oid, apage);
+    if (e = 0) ERR( e );
+    obj = (Object *)apage->data[apage->slot[-(oid)->slotNo].offset];
+
+    for (int i = 0; i < (length == REMAINDER ? obj->header.length : length); i++) {
+        buf[i] = obj->data[i];
+    }
 
     return(length);
     
