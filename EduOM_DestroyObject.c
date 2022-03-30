@@ -129,9 +129,9 @@ Four EduOM_DestroyObject(
         apage->header.nSlots--;
         apage->header.free = offset;
     } else {
-        obj = (Object*)apage->data[offset];
+        obj = (Object*)&(apage->data[offset]);
         alignedLen = ALIGNED_LENGTH(obj->header.length);
-        apage->header.unused += sizeof(obj->header) + alignedLen + sizeof(SlottedPageSlot);
+        apage->header.unused += sizeof(ObjectHdr) + alignedLen;
     }
 
     /* set the dirty bit of page */
