@@ -87,7 +87,43 @@ Four EduOM_CompactPage(
     Two    lastSlot;		/* last non empty slot */
     Two    i;			/* index variable */
 
-    
+    tpage = *apage;
+    apageDataOffset = 0;
+    lastSlot = 0;
+    if (slotNo != NIL) {
+        for (i = 1; i < tpage.header.nSlots; i++) {
+            if (tpage.slot[-i].offset == EMPTYSLOT || i == slotNo) continue;
+            /* copy the object to the original page */
+            apage->data[apageDataOffset] = tpage.data[tpage.slot[-i].offset];
+            /* update the slot offset */
+            apage->slot[-i].offset = apageDataOffset;
+            obj = (Object*)tpage.data[tpage.slot[-i].offset];
+            len = sizeof(obj->header) + sizeof(obj->data);
+            apageDataOffset += len;
+            lastSlot++;
+        }
+        obj = (Object*)tpage.data[tpage.slot[-slotNo].offset];
+        apage->data[apageDataOffset] = tpage.data[tpage.slot[-slotNo].offset];
+        apage->slot[-slotNo].offset = apageDataOffset;
+        apageDataOffset += sizeof(obj);
+        lastSlot++;
+    } else {
+        for (i = 1; i < tpage.header.nSlots; i++) {
+            if (tpage.slot[-i].offset == EMPTYSLOT) continue;
+            /* copy the object to the original page */
+            apage->data[apageDataOffset] = tpage.data[tpage.slot[-i].offset];
+            /* update the slot offset */
+            apage->slot[-i].offset = apageDataOffset;
+            obj = (Object*)tpage.data[tpage.slot[-i].offset];
+            len = sizeof(obj->header) + sizeof(obj->data);
+            apageDataOffset += len;
+            lastSlot++;
+        }
+    }
+
+    apage->header.unused = 0;
+    apage->header.nSlots = lastSlot + 1;
+    apage->header.free = apageDataOffset;
 
     return(eNOERROR);
     
