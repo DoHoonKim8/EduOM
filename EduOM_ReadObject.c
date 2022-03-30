@@ -113,7 +113,7 @@ Four EduOM_ReadObject(
 
     e = IS_VALID_OBJECTID(oid, apage);
     if (e = 0) ERR( e );
-    obj = (Object *)apage->data[apage->slot[-(oid)->slotNo].offset];
+    obj = (Object *)&(apage->data[apage->slot[-(oid)->slotNo].offset]);
 
     for (int i = 0; i < (length == REMAINDER ? obj->header.length : length); i++) {
         buf[i] = obj->data[i];
