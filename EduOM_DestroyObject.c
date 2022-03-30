@@ -104,8 +104,57 @@ Four EduOM_DestroyObject(
 
     if (oid == NULL) ERR(eBADOBJECTID_OM);
 
+    /* read the catalog object */
+    e = BfM_GetTrain((TrainID*)catObjForFile, (char**)&catPage, PAGE_BUF);
+    if (e < 0) ERR( e );
+    GET_PTR_TO_CATENTRY_FOR_DATA(catObjForFile, catPage, catEntry);
 
-    
+    /* read the page storing the object to be deleted */
+    pid.pageNo = oid->pageNo;
+    pid.volNo = oid->volNo;
+    e = BfM_GetTrain(&pid, (char**)&apage, PAGE_BUF);
+    if (e < 0) ERR( e );
+
+    /* remove from currently available space list */
+    e = om_RemoveFromAvailSpaceList(catObjForFile, &pid, apage);
+    if (e < 0) ERRB1(e , &pid, PAGE_BUF);
+
+    /* set the slot corresponding to the object as an EMPTYSLOT */
+    offset = apage->slot[-(oid->slotNo)].offset;
+    apage->slot[-(oid->slotNo)].offset = EMPTYSLOT;
+
+    /* if the slotNo is the last slot of the slot array, decrease the nSlots */
+    last = (oid->slotNo + 1 == apage->header.nSlots);
+    if (last) {
+        apage->header.nSlots--;
+        apage->header.free = offset;
+    } else {
+        obj = (Object*)apage->data[offset];
+        alignedLen = ALIGNED_LENGTH(obj->header.length);
+        apage->header.unused += sizeof(obj->header) + alignedLen + sizeof(SlottedPageSlot);
+    }
+
+    /* set the dirty bit of page */
+    e = BfM_SetDirty(&pid, PAGE_BUF);
+    if (e < 0) ERRB1(e, &pid, PAGE_BUF);
+
+    /* if the deleted object is the only object in the page, and the page is not the first page of file */
+    if (apage->header.nSlots == 1 && oid->pageNo != catEntry->firstPage) {
+        e = om_FileMapDeletePage(catObjForFile, &pid);
+        if (e < 0) ERRB1(e, &pid, PAGE_BUF);
+        e = Util_getElementFromPool(dlPool, &dlElem);
+        if (e < 0) ERRB1(e, &pid, PAGE_BUF);
+        dlElem->type = DL_PAGE;
+        dlElem->elem.pid = pid;
+        dlElem->next = dlHead -> next;
+        dlHead->next = dlElem;
+    } else {
+        e = om_PutInAvailSpaceList(catObjForFile, &pid, apage);
+        if (e < 0) ERRB1(e, &pid, PAGE_BUF);
+    }
+
+    BfM_FreeTrain((TrainID*)catObjForFile, PAGE_BUF);
+
     return(eNOERROR);
     
 } /* EduOM_DestroyObject() */
