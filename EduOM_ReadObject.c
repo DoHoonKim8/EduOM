@@ -108,18 +108,20 @@ Four EduOM_ReadObject(
     
     if (buf == NULL) ERR(eBADUSERBUF_OM);
 
-    e = BfM_GetTrain((TrainID*)oid, (char**)&apage, PAGE_BUF);
+    pid.pageNo = oid->pageNo;
+    pid.volNo = oid->volNo;
+    e = BfM_GetTrain(&pid, (char**)&apage, PAGE_BUF);
     if (e < 0) ERR( e );
 
     e = IS_VALID_OBJECTID(oid, apage);
     if (e = 0) ERR( e );
-    obj = (Object *)&(apage->data[apage->slot[-(oid)->slotNo].offset]);
+    offset = apage->slot[-(oid->slotNo)].offset;
+    obj = (Object*)&(apage->data[offset]);
 
-    for (int i = 0; i < (length == REMAINDER ? obj->header.length : length); i++) {
-        buf[i] = obj->data[i];
-    }
+    length = length == REMAINDER ? obj->header.length - start : length;
+    strncpy(buf, &(obj->data[start]), length);
 
-    BfM_FreeTrain((TrainID*)oid, PAGE_BUF);
+    BfM_FreeTrain(&pid, PAGE_BUF);
 
     return(length);
     
