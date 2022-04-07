@@ -109,6 +109,11 @@ Four EduOM_DestroyObject(
     if (e < 0) ERR( e );
     GET_PTR_TO_CATENTRY_FOR_DATA(catObjForFile, catPage, catEntry);
 
+    pFid.pageNo = catEntry->firstPage;
+    pFid.volNo = catEntry->fid.volNo;
+
+    BfM_FreeTrain((TrainID*)catObjForFile, PAGE_BUF);
+
     /* read the page storing the object to be deleted */
     pid.pageNo = oid->pageNo;
     pid.volNo = oid->volNo;
@@ -126,7 +131,11 @@ Four EduOM_DestroyObject(
     /* if the slotNo is the last slot of the slot array, decrease the nSlots */
     last = (oid->slotNo + 1 == apage->header.nSlots);
     if (last) {
-        apage->header.nSlots--;
+        for (i = oid->slotNo; i >= 0; i--) {
+            if (apage->slot[-i].offset != EMPTYSLOT) break;
+            apage->slot[-i].offset--;
+        }
+        apage->header.nSlots = i + 1;
         apage->header.free = offset;
     } else {
         obj = (Object*)&(apage->data[offset]);
@@ -139,7 +148,7 @@ Four EduOM_DestroyObject(
     if (e < 0) ERRB1(e, &pid, PAGE_BUF);
 
     /* if the deleted object is the only object in the page, and the page is not the first page of file */
-    if (apage->header.nSlots == 1 && oid->pageNo != catEntry->firstPage) {
+    if (apage->header.nSlots == 0 && oid->pageNo != pFid.pageNo) {
         e = om_FileMapDeletePage(catObjForFile, &pid);
         if (e < 0) ERRB1(e, &pid, PAGE_BUF);
         e = Util_getElementFromPool(dlPool, &dlElem);
@@ -153,7 +162,7 @@ Four EduOM_DestroyObject(
         if (e < 0) ERRB1(e, &pid, PAGE_BUF);
     }
 
-    BfM_FreeTrain((TrainID*)catObjForFile, PAGE_BUF);
+    BfM_FreeTrain(&pid, PAGE_BUF);
 
     return(eNOERROR);
     
